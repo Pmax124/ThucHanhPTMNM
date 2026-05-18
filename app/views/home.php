@@ -106,6 +106,25 @@
     </div>
 </div>
 
+<!-- Danh mục nhanh -->
+<div class="container mb-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex flex-wrap justify-content-center gap-2">
+                <a href="/" class="btn btn-outline-primary rounded-pill px-3">
+                    <i class="fas fa-th"></i> Tất cả
+                </a>
+                <?php foreach ($categories as $cat): ?>
+                    <a href="/?category=<?php echo $cat->id; ?>" 
+                       class="btn btn-outline-secondary rounded-pill px-3">
+                        <?php echo htmlspecialchars($cat->name); ?>
+                    </a>
+                <?php endforeach; ?>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div class="container">
     <!-- Bộ lọc sản phẩm -->
     <div class="filter-section">
