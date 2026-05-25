@@ -1,4 +1,5 @@
 <?php
+session_start();
 require_once 'app/models/ProductModel.php';
 $url = $_GET['url'] ?? '';
 $url = rtrim($url, '/');

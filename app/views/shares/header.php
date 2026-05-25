@@ -11,6 +11,32 @@
     <style>
         .navbar-brand { font-weight: bold; }
         
+        /* Style cho giỏ hàng */
+        .cart-icon {
+            position: relative;
+            font-size: 1.2rem;
+            color: #667eea;
+            transition: color 0.3s;
+        }
+        
+        .cart-icon:hover {
+            color: #764ba2;
+        }
+        
+        .cart-count {
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            background: #e74c3c;
+            color: white;
+            border-radius: 50%;
+            padding: 2px 6px;
+            font-size: 0.7rem;
+            font-weight: bold;
+            min-width: 18px;
+            text-align: center;
+        }
+        
         /* Style cho Banner/Slider */
         .banner-section {
             margin-bottom: 30px;
@@ -134,6 +160,21 @@
                 </div>
             </li>
 
+           <!-- Menu Voucher -->
+            <li class="nav-item dropdown">
+                <a class="nav-link dropdown-toggle" href="#" id="voucherDropdown" role="button" data-toggle="dropdown">
+                    <i class="fas fa-gift"></i> Voucher
+                </a>
+                <div class="dropdown-menu">
+                    <a class="dropdown-item" href="/Voucher/list">
+                        <i class="fas fa-list"></i> Danh sách voucher
+                    </a>
+                    <a class="dropdown-item" href="/Voucher/add">
+                        <i class="fas fa-plus"></i> Tạo voucher mới
+                    </a>
+                </div>
+            </li>
+
             <!-- Menu Trang chủ -->
             <li class="nav-item">
                 <a class="nav-link" href="/">
@@ -142,8 +183,27 @@
             </li>
         </ul>
 
-        <!-- User info -->
-        <ul class="navbar-nav">
+        <!-- User info & Cart -->
+        <ul class="navbar-nav align-items-center">
+            <!-- Giỏ hàng (MỚI) -->
+            <li class="nav-item mr-3">
+                <a class="nav-link cart-icon" href="/Product/cart">
+                    <i class="fas fa-shopping-cart"></i>
+                    <?php 
+                    $cart_count = isset($_SESSION['cart']) ? count($_SESSION['cart']) : 0;
+                    if ($cart_count > 0): 
+                    ?>
+                        <span class="cart-count"><?php echo $cart_count; ?></span>
+                    <?php endif; ?>
+                </a>
+            </li>
+            
+            <!-- Divider -->
+            <li class="nav-item">
+                <span class="nav-link text-muted">|</span>
+            </li>
+            
+            <!-- User info -->
             <li class="nav-item">
                 <span class="nav-text text-muted small pt-2">Admin</span>
             </li>
