@@ -106,6 +106,77 @@
     </div>
 </div>
 
+<!-- SECTION VOUCHER GIẢM GIÁ -->
+<?php
+// Load voucher từ controller
+require_once 'app/models/VoucherModel.php';
+$voucherModel = new VoucherModel($this->db ?? (new Database())->getConnection());
+$vouchers = $voucherModel->getActiveVouchers();
+?>
+
+<?php if (!empty($vouchers)): ?>
+<div class="container mb-5">
+    <div class="card border-warning shadow-sm">
+        <div class="card-header bg-warning text-dark">
+            <h5 class="mb-0"><i class="fas fa-gift"></i> 🎁 Mã Giảm Giá Hot</h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <?php foreach ($vouchers as $voucher): ?>
+                <div class="col-md-4 col-sm-6 mb-3">
+                    <div class="voucher-card border rounded p-3 position-relative" 
+                         style="background: linear-gradient(135deg, #fff9e6 0%, #fff 100%);">
+                        
+                        <!-- Nút Copy -->
+                        <button class="btn btn-sm btn-outline-secondary position-absolute" 
+                                style="top: 10px; right: 10px;"
+                                onclick="copyVoucher('<?php echo $voucher->code; ?>', this)">
+                            <i class="fas fa-copy"></i> Copy
+                        </button>
+                        
+                        <!-- Mã voucher -->
+                        <div class="text-center mb-2">
+                            <code class="voucher-code bg-light px-3 py-2 rounded font-weight-bold" 
+                                  style="font-size: 1.2rem; letter-spacing: 2px;">
+                                <?php echo htmlspecialchars($voucher->code); ?>
+                            </code>
+                        </div>
+                        
+                        <!-- Mô tả giảm giá -->
+                        <p class="text-center mb-2 small">
+                            <?php 
+                            if ($voucher->discount_type == 'percent') {
+                                echo "Giảm <strong>{$voucher->discount_value}%</strong>";
+                            } else {
+                                echo "Giảm <strong>" . number_format($voucher->discount_value, 0, ',', '.') . "đ</strong>";
+                            }
+                            ?>
+                        </p>
+                        
+                        <!-- Điều kiện -->
+                        <?php if ($voucher->min_order_value > 0): ?>
+                        <p class="text-center text-muted small mb-0">
+                            <i class="fas fa-info-circle"></i> 
+                            Đơn tối thiểu: <?php echo number_format($voucher->min_order_value, 0, ',', '.'); ?>đ
+                        </p>
+                        <?php endif; ?>
+                        
+                        <!-- Thời hạn -->
+                        <?php if ($voucher->end_date): ?>
+                        <p class="text-center text-muted small mb-0">
+                            <i class="fas fa-clock"></i> 
+                            Hết hạn: <?php echo date('d/m/Y', strtotime($voucher->end_date)); ?>
+                        </p>
+                        <?php endif; ?>
+                    </div>
+                </div>
+                <?php endforeach; ?>
+            </div>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
+
 <!-- Danh mục nhanh -->
 <div class="container mb-4">
     <div class="row">
@@ -234,10 +305,28 @@
                         <div class="product-price">
                             <?php echo number_format($product->price, 0, ',', '.'); ?> đ
                         </div>
-                        <a href="/Product/show/<?php echo $product->id; ?>" 
-                           class="btn btn-outline-primary btn-block">
-                            <i class="fas fa-eye"></i> Xem chi tiết
-                        </a>
+                       <div class="mt-auto">
+                        <div class="row no-gutters">
+                            <div class="col-6 pr-1">
+                                <a href="/Product/show/<?php echo $product->id; ?>" 
+                                class="btn btn-outline-primary btn-block">
+                                    <i class="fas fa-eye"></i> Chi tiết
+                                </a>
+                            </div>
+                            <div class="col-6 pl-1">
+                                <a href="/Product/addToCart/<?php echo $product->id; ?>" 
+                                class="btn btn-success btn-block">
+                                    <i class="fas fa-cart-plus"></i> Mua ngay
+                                </a>
+                            </div>
+                            <!-- Nút Thêm vào giỏ (AJAX - không chuyển trang) -->
+                            <button onclick="addToCartAjax(<?php echo $product->id; ?>)" 
+                                    class="btn btn-outline-primary btn-block mt-1"
+                                    id="btn-add-<?php echo $product->id; ?>">
+                                <i class="fas fa-cart-plus"></i> Thêm vào giỏ
+                            </button>
+                        </div>
+                    </div>
                     </div>
                 </div>
             </div>
@@ -301,6 +390,81 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 });
+
+function addToCartAjax(productId) {
+    // Hiển thị loading
+    const btn = document.getElementById('btn-add-' + productId);
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Đang thêm...';
+    btn.disabled = true;
+    
+    // Gửi AJAX request
+    fetch('/Product/addToCartAjax/' + productId)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Cập nhật số lượng trên icon giỏ hàng
+                updateCartCount(data.cartCount);
+                
+                // Thông báo thành công
+                alert('✅ Đã thêm sản phẩm vào giỏ hàng!');
+                
+                // Reset button
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            } else {
+                alert('❌ ' + data.message);
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('❌ Có lỗi xảy ra!');
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+        });
+}
+
+function updateCartCount(count) {
+    // Tìm element cart-count và cập nhật
+    let cartCountEl = document.querySelector('.cart-count');
+    if (cartCountEl) {
+        cartCountEl.textContent = count;
+    } else {
+        // Nếu chưa có thì tạo mới
+        const cartIcon = document.querySelector('.cart-icon');
+        if (cartIcon) {
+            const badge = document.createElement('span');
+            badge.className = 'cart-count';
+            badge.textContent = count;
+            cartIcon.appendChild(badge);
+        }
+    }
+}
+
+function copyVoucher(code, btn) {
+    navigator.clipboard.writeText(code).then(function() {
+        // Hiệu ứng thành công
+        const originalText = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-check"></i> Đã copy!';
+        btn.classList.remove('btn-outline-secondary');
+        btn.classList.add('btn-success');
+        
+        // Thông báo toast (nếu có)
+        alert('🎉 Đã copy mã: ' + code);
+        
+        // Reset button sau 2 giây
+        setTimeout(function() {
+            btn.innerHTML = originalText;
+            btn.classList.remove('btn-success');
+            btn.classList.add('btn-outline-secondary');
+        }, 2000);
+    }).catch(function(err) {
+        console.error('Copy failed:', err);
+        alert('❌ Không thể copy. Vui lòng chọn và copy thủ công.');
+    });
+}
 </script>
 
 <?php include 'app/views/shares/footer.php'; ?>
