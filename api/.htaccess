@@ -1,0 +1,35 @@
+RewriteEngine On
+
+# ===== CORS HEADERS =====
+Header set Access-Control-Allow-Origin "*"
+Header set Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
+Header set Access-Control-Allow-Headers "Content-Type, Authorization, X-Requested-With"
+
+# ===== HANDLE PREFLIGHT OPTIONS =====
+RewriteCond %{REQUEST_METHOD} OPTIONS
+RewriteRule ^(.*)$ $1 [R=200,L]
+
+# ===== SERVE STATIC FILES (HTML, CSS, JS, IMAGES) =====
+RewriteCond %{REQUEST_FILENAME} -f
+RewriteRule ^ - [L]
+
+# ===== SERVE EXISTING DIRECTORIES =====
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
+
+# ===== API VIEWS (PHP) =====
+# ✅ SỬA: index.html → index.php
+RewriteRule ^views/?$ views/index.php [L]
+RewriteRule ^views/(.*)$ views/$1 [L]
+
+# ===== CATEGORY API =====
+RewriteRule ^categories/([0-9]+)$ CategoryAPI.php?id=$1 [QSA,L]
+RewriteRule ^categories$ CategoryAPI.php [QSA,L]
+
+# ===== PRODUCT API =====
+RewriteRule ^products/([0-9]+)$ ProductAPI.php?id=$1 [QSA,L]
+RewriteRule ^products$ ProductAPI.php [QSA,L]
+
+# ===== ACCOUNT API =====
+RewriteRule ^accounts/([0-9]+)$ AccountAPI.php?id=$1 [QSA,L]
+RewriteRule ^accounts$ AccountAPI.php [QSA,L]

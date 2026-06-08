@@ -36,33 +36,27 @@
             <div class="table-responsive">
                 <table class="table table-hover mb-0">
                     <thead class="table-light">
-                            <tr>
-                                <th>ID</th>
-                                <th>Tên đăng nhập</th>
-                                <th>Email</th>
-                                <th>SĐT</th>
-                                <th>Vai trò</th>
-                                <th>Trạng thái</th>
-                                <th>Ngày tạo</th>
-                                <th>Thao tác</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php foreach ($users as $u): ?>
-                            <tr>
-                                <td>#<?= $u['id'] ?></td>
-                                <td><?= htmlspecialchars($u['username']) ?></td>
-                                <td><?= htmlspecialchars($u['email'] ?? '-') ?></td>
-                                <td><?= htmlspecialchars($u['phone'] ?? '-') ?></td>
-                                <td><span class="badge <?= $u['role'] === 'admin' ? 'bg-danger' : 'bg-secondary' ?>"><?= strtoupper($u['role']) ?></span></td>
-                                <td><?= $u['status'] ? '<span class="badge bg-success">Hoạt động</span>' : '<span class="badge bg-warning">Khóa</span>' ?></td>
-                                <td><?= date('d/m/Y', strtotime($u['created_at'])) ?></td>
-                                <td>
-                                    <a href="/User/edit/<?= $u['id'] ?>" class="btn btn-sm btn-info"><i class="fas fa-edit"></i></a>
-                                    <button onclick="if(confirm('Xóa?')) location.href='/User/delete/<?= $u['id'] ?>'" class="btn btn-sm btn-danger"><i class="fas fa-trash"></i></button>
-                                    
-                                </td>
-                                  <!-- ✅ Cột Trạng thái: Hiển thị badge màu -->
+                        <tr>
+                            <th>ID</th>
+                            <th>Tên đăng nhập</th>
+                            <th>Email</th>
+                            <th>SĐT</th>
+                            <th>Vai trò</th>
+                            <th>Trạng thái</th>
+                            <th>Ngày tạo</th>
+                            <th>Thao tác</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($users as $u): ?>
+                        <tr>
+                            <td>#<?= $u['id'] ?></td>
+                            <td><?= htmlspecialchars($u['username']) ?></td>
+                            <td><?= htmlspecialchars($u['email'] ?? '-') ?></td>
+                            <td><?= htmlspecialchars($u['phone'] ?? '-') ?></td>
+                            <td><span class="badge <?= $u['role'] === 'admin' ? 'bg-danger' : 'bg-secondary' ?>"><?= strtoupper($u['role']) ?></span></td>
+                            
+                            <!-- ✅ Cột Trạng thái: Hiển thị badge màu -->
                             <td>
                                 <?php if ($u['status'] == 1): ?>
                                     <span class="badge bg-success">Hoạt động</span>
@@ -102,9 +96,9 @@
                                     </button>
                                 </div>
                             </td>
-                            </tr>
-                            <?php endforeach; ?>
-                        </tbody>
+                        </tr>
+                        <?php endforeach; ?>
+                    </tbody>
                 </table>
             </div>
         </div>

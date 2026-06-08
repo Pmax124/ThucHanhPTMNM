@@ -1,4 +1,5 @@
 <?php
+date_default_timezone_set('Asia/Ho_Chi_Minh');
 require_once 'app/config/google_config.php';
 require_once('app/config/database.php');
 require_once('app/models/AccountModel.php');
@@ -434,105 +435,155 @@ class AccountController {
     /**
      * Xử lý yêu cầu reset mật khẩu
      */
-    public function handleForgotPassword() {
-        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-            header('Location: /account/forgot-password');
-            exit();
-        }
-        
-        $email = trim($_POST['email'] ?? '');
-        
-        if (empty($email)) {
-            $_SESSION['error'] = 'Vui lòng nhập email!';
-            header('Location: /account/forgot-password');
-            exit();
-        }
-        
-        // Kiểm tra email có tồn tại
-        $stmt = $this->db->prepare("SELECT id, username FROM account WHERE email = ? AND status = 1");
-        $stmt->execute([$email]);
-        $user = $stmt->fetch(PDO::FETCH_ASSOC);
-        
-        if (!$user) {
-            // Không báo lỗi cụ thể để tránh lộ thông tin
-            $_SESSION['success'] = 'Nếu email tồn tại, bạn sẽ nhận được hướng dẫn reset mật khẩu!';
-            header('Location: /account/forgot-password');
-            exit();
-        }
-        
-        // Tạo token
-        $token = bin2hex(random_bytes(32));
-        $expiresAt = date('Y-m-d H:i:s', strtotime('+1 hour')); // Token hết hạn sau 1 giờ
-        
-        // Lưu hoặc cập nhật token
-        $stmt = $this->db->prepare("INSERT INTO password_resets (email, token, expires_at) 
-                                    VALUES (?, ?, ?) 
-                                    ON DUPLICATE KEY UPDATE token = ?, expires_at = ?");
-        $stmt->execute([$email, $token, $expiresAt, $token, $expiresAt]);
-        
-        // Tạo link reset
-        $resetLink = "http://localhost:8080/account/reset-password?token=$token";
-        
-        // ✅ LƯU TOKEN VÀO SESSION ĐỂ TEST (vì localhost không gửi email được)
-        $_SESSION['reset_token'] = $token;
-        $_SESSION['reset_email'] = $email;
-        $_SESSION['success'] = "✅ Mã reset đã được tạo! (Demo mode)<br><br>
-                               <strong>Token:</strong> <code>$token</code><br><br>
-                               <strong>Link reset:</strong> <a href='$resetLink' target='_blank'>$resetLink</a><br><br>
-                               <small>Trong production, token này sẽ được gửi qua email.</small>";
-        
+   public function handleForgotPassword() {
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
         header('Location: /account/forgot-password');
         exit();
     }
     
+    $email = trim($_POST['email'] ?? '');
+    
+    if (empty($email)) {
+        $_SESSION['error'] = 'Vui lòng nhập email!';
+        header('Location: /account/forgot-password');
+        exit();
+    }
+    
+    // Kiểm tra email có tồn tại
+    $stmt = $this->db->prepare("SELECT id, username FROM account WHERE email = ? AND status = 1");
+    $stmt->execute([$email]);
+    $user = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    if (!$user) {
+        $_SESSION['success'] = 'Nếu email tồn tại, bạn sẽ nhận được hướng dẫn reset mật khẩu!';
+        header('Location: /account/forgot-password');
+        exit();
+    }
+    
+    // ✅ TẠO TOKEN
+    $token = bin2hex(random_bytes(32));
+    
+    // ✅ XÓA TOKEN CŨ TRƯỚC (vì bảng không có UNIQUE KEY)
+    $stmt = $this->db->prepare("DELETE FROM password_resets WHERE email = ?");
+    $stmt->execute([$email]);
+    
+    // ✅ DÙNG NOW() + INTERVAL CỦA MYSQL (đảm bảo cùng timezone khi check)
+    $stmt = $this->db->prepare("
+        INSERT INTO password_resets (email, token, expires_at) 
+        VALUES (?, ?, NOW() + INTERVAL 1 HOUR)
+    ");
+    $stmt->execute([$email, $token]);
+    
+    // ✅ TẠO LINK ĐỘNG (không hardcode localhost)
+    $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+    $host = $_SERVER['HTTP_HOST'];
+    $resetLink = $protocol . '://' . $host . '/account/reset-password?token=' . $token;
+    
+    // Debug: Xem token vừa tạo
+    $stmt = $this->db->query("SELECT created_at, expires_at FROM password_resets WHERE token = '$token'");
+    $debug = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    $_SESSION['reset_token'] = $token;
+    $_SESSION['reset_email'] = $email;
+    $_SESSION['success'] = "✅ Mã reset đã được tạo! (Demo mode)<br><br>
+                           <strong>Token:</strong> <code>$token</code><br><br>
+                           <strong>Link reset:</strong> <a href='$resetLink' target='_blank' style='color:blue;font-weight:bold'>👉 Click vào đây để reset mật khẩu</a><br><br>
+                           <small>📅 Created: {$debug['created_at']} | ⏰ Expires: {$debug['expires_at']}</small>";
+    
+    header('Location: /account/forgot-password');
+    exit();
+}
+
+/**
+ * Hiển thị trang reset mật khẩu (GET request)
+ */
+public function resetPassword() {
+    // Lấy token từ URL
+    $token = $_GET['token'] ?? '';
+    
+    // Debug log
+    error_log("resetPassword() called - Token: " . substr($token, 0, 20) . "...");
+    
+    // Truyền token vào view
+    include 'app/views/account/reset_password.php';
+}
+    
         /**
      * Hiển thị trang reset mật khẩu (LUÔN hiện form, không chặn)
      */
-    public function resetPassword() {
-        $token = $_GET['token'] ?? '';
-        include 'app/views/account/reset_password.php';
-    }
-
-    /**
-     * Xử lý khi người dùng bấm nút "Cập nhật mật khẩu"
-     */
-    public function handleResetPassword() {
-        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-            header('Location: /account/forgot-password');
-            exit();
-        }
-
-        $token = $_POST['token'] ?? '';
-        $password = $_POST['password'] ?? '';
-        $confirm = $_POST['confirm_password'] ?? '';
-
-        // 1. Validate cơ bản
-        if (empty($token) || strlen($password) < 6 || $password !== $confirm) {
-            $_SESSION['error'] = 'Mật khẩu phải trên 6 ký tự và phải khớp nhau.';
-            header('Location: /account/reset-password?token=' . urlencode($token));
-            exit();
-        }
-
-        // 2. Chỉ check token hợp lệ KHI SUBMIT
-        $stmt = $this->db->prepare("SELECT email FROM password_resets WHERE token = ? AND used = 0 AND expires_at > NOW()");
-        $stmt->execute([$token]);
-        $row = $stmt->fetch(PDO::FETCH_ASSOC);
-
-        if (!$row) {
-            $_SESSION['error'] = 'Link đã hết hạn hoặc không hợp lệ. Vui lòng yêu cầu reset lại.';
-            header('Location: /account/forgot-password');
-            exit();
-        }
-
-        // 3. Cập nhật mật khẩu & đánh dấu token đã dùng
-        $hash = password_hash($password, PASSWORD_DEFAULT);
-        $this->db->prepare("UPDATE account SET password = ? WHERE email = ?")->execute([$hash, $row['email']]);
-        $this->db->prepare("UPDATE password_resets SET used = 1 WHERE token = ?")->execute([$token]);
-
-        $_SESSION['success'] = '✅ Đổi mật khẩu thành công! Vui lòng đăng nhập lại.';
-        header('Location: /account/login');
+   /**
+ * Xử lý khi người dùng bấm nút "Cập nhật mật khẩu"
+ */
+public function handleResetPassword() {
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        header('Location: /account/forgot-password');
         exit();
     }
+
+    $token = $_POST['token'] ?? '';
+    $password = $_POST['password'] ?? '';
+    $confirm = $_POST['confirm_password'] ?? '';
+
+    // 1. Validate cơ bản
+    if (empty($token)) {
+        $_SESSION['error'] = 'Token không hợp lệ!';
+        header('Location: /account/forgot-password');
+        exit();
+    }
+    
+    if (strlen($password) < 6) {
+        $_SESSION['error'] = 'Mật khẩu phải có ít nhất 6 ký tự!';
+        header('Location: /account/reset-password?token=' . urlencode($token));
+        exit();
+    }
+    
+    if ($password !== $confirm) {
+        $_SESSION['error'] = 'Mật khẩu xác nhận không khớp!';
+        header('Location: /account/reset-password?token=' . urlencode($token));
+        exit();
+    }
+
+    // 2. ✅ DEBUG: Lấy đầy đủ thông tin token
+    $stmt = $this->db->prepare("SELECT * FROM password_resets WHERE token = ?");
+    $stmt->execute([$token]);
+    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    if (!$row) {
+        $_SESSION['error'] = '❌ Token không tồn tại trong database!';
+        header('Location: /account/forgot-password');
+        exit();
+    }
+
+    // 3. ✅ Check từng điều kiện riêng (tránh lỗi timezone)
+    if ($row['used'] == 1) {
+        $_SESSION['error'] = '❌ Token đã được sử dụng! Vui lòng yêu cầu reset lại.';
+        header('Location: /account/forgot-password');
+        exit();
+    }
+    
+    // ✅ Dùng strtotime() để so sánh - tránh lỗi timezone giữa PHP và MySQL
+    $now = time();
+    $expiresTime = strtotime($row['expires_at']);
+    
+    if ($expiresTime < $now) {
+        $_SESSION['error'] = '❌ Token đã hết hạn!<br>
+                             <small>Expires: ' . $row['expires_at'] . '<br>
+                             Now: ' . date('Y-m-d H:i:s') . '</small>';
+        header('Location: /account/forgot-password');
+        exit();
+    }
+
+    // 4. Cập nhật mật khẩu & đánh dấu token đã dùng
+    $hash = password_hash($password, PASSWORD_DEFAULT);
+    $email = $row['email'];
+    
+    $this->db->prepare("UPDATE account SET password = ? WHERE email = ?")->execute([$hash, $email]);
+    $this->db->prepare("UPDATE password_resets SET used = 1 WHERE token = ?")->execute([$token]);
+
+    $_SESSION['success'] = '✅ Đổi mật khẩu thành công! Vui lòng đăng nhập lại.';
+    header('Location: /account/login');
+    exit();
+}
     
     
 }
