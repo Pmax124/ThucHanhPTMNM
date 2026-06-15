@@ -33,3 +33,25 @@ RewriteRule ^products$ ProductAPI.php [QSA,L]
 # ===== ACCOUNT API =====
 RewriteRule ^accounts/([0-9]+)$ AccountAPI.php?id=$1 [QSA,L]
 RewriteRule ^accounts$ AccountAPI.php [QSA,L]
+
+# ===== ORDER API =====
+RewriteRule ^orders/([0-9]+)$ OrderAPI.php?id=$1 [QSA,L]
+RewriteRule ^orders$ OrderAPI.php [QSA,L]
+
+# ===== AUTH API (LOGIN/REGISTER) =====
+RewriteRule ^auth$ LoginAPI.php [QSA,L]
+RewriteRule ^auth/(.+)$ LoginAPI.php?action=$1 [QSA,L]
+
+# Cart API
+RewriteRule ^cart$ CartAPI.php [QSA,L]
+RewriteRule ^cart/(.+)$ CartAPI.php?action=$1 [QSA,L]
+RewriteRule ^cart/([0-9]+)$ CartAPI.php?id=$1 [QSA,L]
+
+# Payment API
+RewriteRule ^payment$ PaymentAPI.php [QSA,L]
+RewriteRule ^payment/(.+)$ PaymentAPI.php?action=$1 [QSA,L]
+RewriteRule ^payment/([0-9]+)$ PaymentAPI.php?id=$1 [QSA,L]
+
+# Auth API
+RewriteRule ^auth$ AuthAPI.php [QSA,L]
+RewriteRule ^auth/(.+)$ AuthAPI.php?action=$1 [QSA,L]

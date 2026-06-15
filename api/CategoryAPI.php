@@ -20,6 +20,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 // Load dependencies
 require_once __DIR__ . '/../app/config/database.php';
 require_once __DIR__ . '/../app/models/CategoryModel.php';
+require_once __DIR__ . '/middleware/AuthMiddleware.php';
 
 // Initialize database and model
 $database = new Database();
@@ -32,7 +33,9 @@ $id = $_GET['id'] ?? null;
 
 // Route based on HTTP method
 switch ($method) {
+    
     case 'GET':
+        AuthMiddleware::requireAdmin();  // Chỉ Admin
         if ($id) {
             getCategory($categoryModel, $id);
         } else {
@@ -41,10 +44,12 @@ switch ($method) {
         break;
 
     case 'POST':
+        AuthMiddleware::requireAdmin();  // Chỉ Admin
         createCategory($categoryModel);
         break;
 
     case 'PUT':
+        AuthMiddleware::requireAdmin();  // Chỉ Admin
         if ($id) {
             updateCategory($categoryModel, $id);
         } else {
@@ -53,6 +58,7 @@ switch ($method) {
         break;
 
     case 'DELETE':
+        AuthMiddleware::requireAdmin();  // Chỉ Admin
         if ($id) {
             deleteCategory($categoryModel, $id);
         } else {

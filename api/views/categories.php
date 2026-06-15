@@ -1,15 +1,3 @@
-<?php
-// ✅ Start session
-session_start();
-
-// ✅ Lấy thông tin user từ session
-$currentUser = $_SESSION['username'] ?? 'Guest';
-$currentRole = $_SESSION['role'] ?? 'user';
-$userId = $_SESSION['user_id'] ?? null;
-
-// ✅ Thời gian truy cập
-$accessTime = date('H:i:s d/m/Y');
-?>
 <!DOCTYPE html>
 <html lang="vi">
 <head>
@@ -39,48 +27,35 @@ $accessTime = date('H:i:s d/m/Y');
 <body>
     <nav class="navbar navbar-dark bg-dark">
         <div class="container">
-            <!-- ✅ SỬA: Đổi từ index.html thành index.php -->
             <a class="navbar-brand" href="index.php">
                 <i class="fas fa-arrow-left"></i> Quay lại
             </a>
             <span class="navbar-text text-white">
-                <i class="fas fa-tags"></i> Quản lý danh mục (PHP + jQuery)
+                <i class="fas fa-tags"></i> Quản lý danh mục (JWT API)
             </span>
             
-            <!-- ✅ MỚI: Hiển thị thông tin user (PHP) -->
-            <?php if ($userId): ?>
+            <!-- ✅ MỚI: Hiển thị thông tin user bằng JavaScript -->
+            <div class="d-flex align-items-center">
                 <span class="user-info text-white">
                     <i class="fas fa-user-circle"></i> 
-                    <strong><?= htmlspecialchars($currentUser) ?></strong>
-                    <?php if ($currentRole === 'admin'): ?>
-                        <span class="badge bg-danger ms-1">Admin</span>
-                    <?php else: ?>
-                        <span class="badge bg-secondary ms-1">User</span>
-                    <?php endif; ?>
+                    <strong id="current-username">Guest</strong>
+                    <span id="current-role" class="badge bg-secondary ms-1">User</span>
                 </span>
-                <a href="/account/logout" class="btn btn-outline-light btn-sm ms-2">
+                <button onclick="logout()" class="btn btn-outline-light btn-sm ms-2">
                     <i class="fas fa-sign-out-alt"></i> Đăng xuất
-                </a>
-            <?php else: ?>
-                <a href="/account/login" class="btn btn-outline-light btn-sm">
-                    <i class="fas fa-sign-in-alt"></i> Đăng nhập
-                </a>
-            <?php endif; ?>
+                </button>
+            </div>
         </div>
     </nav>
 
     <div class="container mt-4">
-        <!-- ✅ MỚI: Hiển thị thông tin truy cập (PHP) -->
         <div class="alert alert-info d-flex justify-content-between align-items-center">
             <div>
                 <i class="fas fa-info-circle"></i> 
-                <strong>Trang quản lý danh mục</strong> - Sử dụng jQuery AJAX gọi API
+                <strong>Trang quản lý danh mục</strong> - jQuery AJAX + JWT Token
             </div>
             <small class="text-muted">
-                <i class="fas fa-clock"></i> Truy cập: <?= $accessTime ?>
-                <?php if ($userId): ?>
-                    | <i class="fas fa-user"></i> Bởi: <strong><?= htmlspecialchars($currentUser) ?></strong>
-                <?php endif; ?>
+                <i class="fas fa-clock"></i> <span id="access-time">Loading...</span>
             </small>
         </div>
 
@@ -137,13 +112,66 @@ $accessTime = date('H:i:s d/m/Y');
     <script>
         const API_BASE = '/api/categories';
         let categoryModal;
+        let currentUser = null;
+
+        // ✅ GỬI TOKEN TRONG MỌI AJAX REQUEST
+        $(document).ajaxSend(function(event, xhr, settings) {
+            const token = localStorage.getItem('token');
+            if (token) {
+                xhr.setRequestHeader('Authorization', 'Bearer ' + token);
+            }
+        });
+
+        // ✅ XỬ LÝ LỖI 401, 403
+        $(document).ajaxError(function(event, xhr, settings) {
+            if (xhr.status === 401) {
+                alert('⚠️ Phiên đăng nhập hết hạn!');
+                localStorage.removeItem('token');
+                localStorage.removeItem('user');
+                window.location.replace('login.php');
+            } else if (xhr.status === 403) {
+                const msg = xhr.responseJSON?.message || 'Bạn không có quyền';
+                alert('🚫 ' + msg);
+            }
+        });
+
+        function logout() {
+            if (confirm('Bạn có chắc muốn đăng xuất?')) {
+                localStorage.removeItem('token');
+                localStorage.removeItem('user');
+                window.location.replace('login.php');
+            }
+        }
 
         $(document).ready(function() {
+            // ✅ KIỂM TRA ĐĂNG NHẬP BẰNG JWT
+            const token = localStorage.getItem('token');
+            try {
+                currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+            } catch(e) {
+                currentUser = {};
+            }
+            
+            if (!token || !currentUser.username) {
+                alert('⚠️ Vui lòng đăng nhập!');
+                window.location.replace('login.php');
+                return;
+            }
+            
+            // Cập nhật navbar
+            $('#current-username').text(currentUser.username);
+            $('#current-role').text(currentUser.role === 'admin' ? 'Admin' : 'User')
+                             .removeClass('bg-secondary bg-danger')
+                             .addClass(currentUser.role === 'admin' ? 'bg-danger' : 'bg-secondary');
+            
+            // Cập nhật thời gian
+            $('#access-time').text(new Date().toLocaleString('vi-VN'));
+            
             categoryModal = new bootstrap.Modal(document.getElementById('categoryModal'));
             loadCategories();
         });
 
-        // Load danh sách danh mục bằng jQuery AJAX
+        // Load danh sách danh mục
         function loadCategories() {
             $.ajax({
                 url: API_BASE,
@@ -183,12 +211,11 @@ $accessTime = date('H:i:s d/m/Y');
                 },
                 error: function(xhr, status, error) {
                     console.error('Error:', error);
-                    $('#loading').html('<div class="alert alert-danger">Lỗi khi tải dữ liệu!</div>');
+                    $('#loading').html('<div class="alert alert-danger">Lỗi khi tải dữ liệu: ' + xhr.status + '</div>');
                 }
             });
         }
 
-        // Click nút thêm danh mục
         $('#btn-add-category').click(function() {
             $('#modalTitle').text('Thêm danh mục');
             $('#category-form')[0].reset();
@@ -196,7 +223,6 @@ $accessTime = date('H:i:s d/m/Y');
             categoryModal.show();
         });
 
-        // Click nút sửa danh mục (event delegation)
         $(document).on('click', '.btn-edit', function() {
             const id = $(this).data('id');
             
@@ -217,7 +243,6 @@ $accessTime = date('H:i:s d/m/Y');
             });
         });
 
-        // Click nút xóa danh mục (event delegation)
         $(document).on('click', '.btn-delete', function() {
             const id = $(this).data('id');
             
@@ -231,13 +256,12 @@ $accessTime = date('H:i:s d/m/Y');
                         loadCategories();
                     },
                     error: function(xhr, status, error) {
-                        alert('Lỗi khi xóa danh mục!');
+                        alert('Lỗi khi xóa: ' + (xhr.responseJSON?.message || error));
                     }
                 });
             }
         });
 
-        // Submit form thêm/sửa danh mục
         $('#category-form').submit(function(e) {
             e.preventDefault();
             

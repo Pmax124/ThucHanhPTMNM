@@ -1,23 +1,3 @@
-<?php
-// ✅ Start session
-session_start();
-
-// ✅ Lấy thông tin user từ session
-$currentUser = $_SESSION['username'] ?? 'Guest';
-$currentRole = $_SESSION['role'] ?? 'user';
-$userId = $_SESSION['user_id'] ?? null;
-
-// ✅ BẢO MẬT: Chỉ admin mới được truy cập trang quản lý tài khoản
-// (Bỏ comment nếu muốn áp dụng)
-// if (!$userId || $currentRole !== 'admin') {
-//     $_SESSION['error'] = 'Bạn không có quyền truy cập trang này!';
-//     header('Location: /account/login');
-//     exit;
-// }
-
-// ✅ Thời gian truy cập
-$accessTime = date('H:i:s d/m/Y');
-?>
 <!DOCTYPE html>
 <html lang="vi">
 <head>
@@ -45,48 +25,35 @@ $accessTime = date('H:i:s d/m/Y');
 <body>
     <nav class="navbar navbar-dark bg-dark">
         <div class="container">
-            <!-- ✅ SỬA: Đổi từ index.html thành index.php -->
             <a class="navbar-brand" href="index.php">
                 <i class="fas fa-arrow-left"></i> Quay lại
             </a>
             <span class="navbar-text text-white">
-                <i class="fas fa-users-cog"></i> Quản lý tài khoản (PHP + jQuery)
+                <i class="fas fa-users-cog"></i> Quản lý tài khoản (JWT API)
             </span>
             
-            <!-- ✅ MỚI: Hiển thị thông tin user (PHP) -->
-            <?php if ($userId): ?>
+            <!-- ✅ MỚI: Hiển thị thông tin user bằng JavaScript -->
+            <div class="d-flex align-items-center">
                 <span class="user-info text-white">
                     <i class="fas fa-user-circle"></i> 
-                    <strong><?= htmlspecialchars($currentUser) ?></strong>
-                    <?php if ($currentRole === 'admin'): ?>
-                        <span class="badge bg-danger ms-1">Admin</span>
-                    <?php else: ?>
-                        <span class="badge bg-secondary ms-1">User</span>
-                    <?php endif; ?>
+                    <strong id="current-username">Guest</strong>
+                    <span id="current-role" class="badge bg-secondary ms-1">User</span>
                 </span>
-                <a href="/account/logout" class="btn btn-outline-light btn-sm ms-2">
+                <button onclick="logout()" class="btn btn-outline-light btn-sm ms-2">
                     <i class="fas fa-sign-out-alt"></i> Đăng xuất
-                </a>
-            <?php else: ?>
-                <a href="/account/login" class="btn btn-outline-light btn-sm">
-                    <i class="fas fa-sign-in-alt"></i> Đăng nhập
-                </a>
-            <?php endif; ?>
+                </button>
+            </div>
         </div>
     </nav>
 
     <div class="container mt-4">
-        <!-- ✅ MỚI: Hiển thị thông tin truy cập (PHP) -->
         <div class="alert alert-info d-flex justify-content-between align-items-center">
             <div>
                 <i class="fas fa-info-circle"></i> 
-                <strong>Trang quản lý tài khoản</strong> - Sử dụng jQuery AJAX gọi API
+                <strong>Trang quản lý tài khoản</strong> - jQuery AJAX + JWT Token
             </div>
             <small class="text-muted">
-                <i class="fas fa-clock"></i> Truy cập: <?= $accessTime ?>
-                <?php if ($userId): ?>
-                    | <i class="fas fa-user"></i> Bởi: <strong><?= htmlspecialchars($currentUser) ?></strong>
-                <?php endif; ?>
+                <i class="fas fa-clock"></i> <span id="access-time">Loading...</span>
             </small>
         </div>
 
@@ -228,11 +195,64 @@ $accessTime = date('H:i:s d/m/Y');
         let accountModal;
         let currentPage = 1;
         let currentFilters = { keyword: '', role: '', status: '' };
+        let currentUser = null;
 
         const roleLabels = { admin: 'Admin', user: 'User' };
         const roleColors = { admin: 'danger', user: 'secondary' };
 
+        // ✅ GỬI TOKEN TRONG MỌI AJAX REQUEST
+        $(document).ajaxSend(function(event, xhr, settings) {
+            const token = localStorage.getItem('token');
+            if (token) {
+                xhr.setRequestHeader('Authorization', 'Bearer ' + token);
+            }
+        });
+
+        // ✅ XỬ LÝ LỖI 401, 403
+        $(document).ajaxError(function(event, xhr, settings) {
+            if (xhr.status === 401) {
+                alert('⚠️ Phiên đăng nhập hết hạn!');
+                localStorage.removeItem('token');
+                localStorage.removeItem('user');
+                window.location.replace('login.php');
+            } else if (xhr.status === 403) {
+                const msg = xhr.responseJSON?.message || 'Bạn không có quyền';
+                alert('🚫 ' + msg);
+            }
+        });
+
+        function logout() {
+            if (confirm('Bạn có chắc muốn đăng xuất?')) {
+                localStorage.removeItem('token');
+                localStorage.removeItem('user');
+                window.location.replace('login.php');
+            }
+        }
+
         $(document).ready(function() {
+            // ✅ KIỂM TRA ĐĂNG NHẬP BẰNG JWT
+            const token = localStorage.getItem('token');
+            try {
+                currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+            } catch(e) {
+                currentUser = {};
+            }
+            
+            if (!token || !currentUser.username) {
+                alert('⚠️ Vui lòng đăng nhập!');
+                window.location.replace('login.php');
+                return;
+            }
+            
+            // Cập nhật navbar
+            $('#current-username').text(currentUser.username);
+            $('#current-role').text(currentUser.role === 'admin' ? 'Admin' : 'User')
+                             .removeClass('bg-secondary bg-danger')
+                             .addClass(currentUser.role === 'admin' ? 'bg-danger' : 'bg-secondary');
+            
+            // Cập nhật thời gian
+            $('#access-time').text(new Date().toLocaleString('vi-VN'));
+            
             accountModal = new bootstrap.Modal(document.getElementById('accountModal'));
             loadStatistics();
             loadAccounts();
@@ -258,21 +278,26 @@ $accessTime = date('H:i:s d/m/Y');
 
             $(document).on('click', '.btn-edit', function() {
                 const id = $(this).data('id');
-                $.getJSON(`${API_BASE}/${id}`, function(res) {
-                    if (res.status === 'success') {
-                        const a = res.data;
-                        $('#modalTitle').text('Sửa tài khoản #' + a.id);
-                        $('#account_id').val(a.id);
-                        $('#username').val(a.username);
-                        $('#password').val('').prop('required', false);
-                        $('#password-required').hide();
-                        $('#fullname').val(a.fullname || '');
-                        $('#email').val(a.email || '');
-                        $('#phone').val(a.phone || '');
-                        $('#role').val(a.role);
-                        $('#address').val(a.address || '');
-                        $('#status').val(a.status);
-                        accountModal.show();
+                $.ajax({
+                    url: `${API_BASE}/${id}`,
+                    method: 'GET',
+                    dataType: 'json',
+                    success: function(res) {
+                        if (res.status === 'success') {
+                            const a = res.data;
+                            $('#modalTitle').text('Sửa tài khoản #' + a.id);
+                            $('#account_id').val(a.id);
+                            $('#username').val(a.username);
+                            $('#password').val('').prop('required', false);
+                            $('#password-required').hide();
+                            $('#fullname').val(a.fullname || '');
+                            $('#email').val(a.email || '');
+                            $('#phone').val(a.phone || '');
+                            $('#role').val(a.role);
+                            $('#address').val(a.address || '');
+                            $('#status').val(a.status);
+                            accountModal.show();
+                        }
                     }
                 });
             });
@@ -288,6 +313,9 @@ $accessTime = date('H:i:s d/m/Y');
                             alert(res.message);
                             loadAccounts();
                             loadStatistics();
+                        },
+                        error: function(xhr) {
+                            alert('Lỗi: ' + (xhr.responseJSON?.message || 'Không xác định'));
                         }
                     });
                 }
@@ -331,49 +359,57 @@ $accessTime = date('H:i:s d/m/Y');
         });
 
         function loadStatistics() {
-            $.getJSON(`${API_BASE}?action=statistics`, function(res) {
-                if (res.status === 'success') {
-                    let stats = { admin_active: 0, user_active: 0, admin_inactive: 0, user_inactive: 0 };
-                    $.each(res.data, function(i, stat) {
-                        const key = `${stat.role}_${stat.status == 1 ? 'active' : 'inactive'}`;
-                        stats[key] = parseInt(stat.count);
-                    });
+            $.ajax({
+                url: `${API_BASE}?action=statistics`,
+                method: 'GET',
+                dataType: 'json',
+                success: function(res) {
+                    if (res.status === 'success') {
+                        let stats = { admin_active: 0, user_active: 0, admin_inactive: 0, user_inactive: 0 };
+                        $.each(res.data, function(i, stat) {
+                            const key = `${stat.role}_${stat.status == 1 ? 'active' : 'inactive'}`;
+                            stats[key] = parseInt(stat.count);
+                        });
 
-                    let html = `
-                        <div class="col-md-3">
-                            <div class="card stat-card admin-active">
-                                <div class="card-body">
-                                    <h6 class="text-muted text-uppercase small">Admin (Active)</h6>
-                                    <h4 class="mb-1 text-danger">${stats.admin_active}</h4>
+                        let html = `
+                            <div class="col-md-3">
+                                <div class="card stat-card admin-active">
+                                    <div class="card-body">
+                                        <h6 class="text-muted text-uppercase small">Admin (Active)</h6>
+                                        <h4 class="mb-1 text-danger">${stats.admin_active}</h4>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                        <div class="col-md-3">
-                            <div class="card stat-card user-active">
-                                <div class="card-body">
-                                    <h6 class="text-muted text-uppercase small">User (Active)</h6>
-                                    <h4 class="mb-1 text-success">${stats.user_active}</h4>
+                            <div class="col-md-3">
+                                <div class="card stat-card user-active">
+                                    <div class="card-body">
+                                        <h6 class="text-muted text-uppercase small">User (Active)</h6>
+                                        <h4 class="mb-1 text-success">${stats.user_active}</h4>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                        <div class="col-md-3">
-                            <div class="card stat-card admin-inactive">
-                                <div class="card-body">
-                                    <h6 class="text-muted text-uppercase small">Admin (Inactive)</h6>
-                                    <h4 class="mb-1 text-secondary">${stats.admin_inactive}</h4>
+                            <div class="col-md-3">
+                                <div class="card stat-card admin-inactive">
+                                    <div class="card-body">
+                                        <h6 class="text-muted text-uppercase small">Admin (Inactive)</h6>
+                                        <h4 class="mb-1 text-secondary">${stats.admin_inactive}</h4>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                        <div class="col-md-3">
-                            <div class="card stat-card user-inactive">
-                                <div class="card-body">
-                                    <h6 class="text-muted text-uppercase small">User (Inactive)</h6>
-                                    <h4 class="mb-1 text-warning">${stats.user_inactive}</h4>
+                            <div class="col-md-3">
+                                <div class="card stat-card user-inactive">
+                                    <div class="card-body">
+                                        <h6 class="text-muted text-uppercase small">User (Inactive)</h6>
+                                        <h4 class="mb-1 text-warning">${stats.user_inactive}</h4>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    `;
-                    $('#statistics').html(html);
+                        `;
+                        $('#statistics').html(html);
+                    }
+                },
+                error: function(xhr) {
+                    console.error('❌ Statistics error:', xhr.status);
                 }
             });
         }
@@ -384,34 +420,44 @@ $accessTime = date('H:i:s d/m/Y');
             if (currentFilters.role) url += `&role=${currentFilters.role}`;
             if (currentFilters.status !== '') url += `&status=${currentFilters.status}`;
 
-            $.getJSON(url, function(res) {
-                $('#loading').hide();
-                if (res.status === 'success') {
-                    let html = '';
-                    if (res.data.length === 0) {
-                        html = '<tr><td colspan="9" class="text-center text-muted py-4">Không có tài khoản</td></tr>';
-                    } else {
-                        $.each(res.data, function(i, a) {
-                            html += `
-                                <tr>
-                                    <td><strong>#${a.id}</strong></td>
-                                    <td>${a.username}</td>
-                                    <td>${a.fullname || '-'}</td>
-                                    <td>${a.email || '-'}</td>
-                                    <td>${a.phone || '-'}</td>
-                                    <td><span class="badge bg-${roleColors[a.role] || 'secondary'}">${roleLabels[a.role] || a.role}</span></td>
-                                    <td><span class="badge bg-${a.status == 1 ? 'success' : 'warning'}">${a.status == 1 ? 'Hoạt động' : 'Bị khóa'}</span></td>
-                                    <td>${new Date(a.created_at).toLocaleDateString('vi-VN')}</td>
-                                    <td>
-                                        <button class="btn btn-sm btn-info btn-edit" data-id="${a.id}"><i class="fas fa-edit"></i></button>
-                                        <button class="btn btn-sm btn-danger btn-delete" data-id="${a.id}"><i class="fas fa-trash"></i></button>
-                                    </td>
-                                </tr>
-                            `;
-                        });
+            $.ajax({
+                url: url,
+                method: 'GET',
+                dataType: 'json',
+                success: function(res) {
+                    $('#loading').hide();
+                    if (res.status === 'success') {
+                        let html = '';
+                        if (res.data.length === 0) {
+                            html = '<tr><td colspan="9" class="text-center text-muted py-4">Không có tài khoản</td></tr>';
+                        } else {
+                            $.each(res.data, function(i, a) {
+                                html += `
+                                    <tr>
+                                        <td><strong>#${a.id}</strong></td>
+                                        <td>${a.username}</td>
+                                        <td>${a.fullname || '-'}</td>
+                                        <td>${a.email || '-'}</td>
+                                        <td>${a.phone || '-'}</td>
+                                        <td><span class="badge bg-${roleColors[a.role] || 'secondary'}">${roleLabels[a.role] || a.role}</span></td>
+                                        <td><span class="badge bg-${a.status == 1 ? 'success' : 'warning'}">${a.status == 1 ? 'Hoạt động' : 'Bị khóa'}</span></td>
+                                        <td>${new Date(a.created_at).toLocaleDateString('vi-VN')}</td>
+                                        <td>
+                                            <button class="btn btn-sm btn-info btn-edit" data-id="${a.id}"><i class="fas fa-edit"></i></button>
+                                            <button class="btn btn-sm btn-danger btn-delete" data-id="${a.id}"><i class="fas fa-trash"></i></button>
+                                        </td>
+                                    </tr>
+                                `;
+                            });
+                        }
+                        $('#account-list').html(html);
+                        renderPagination(res.page, res.total_pages);
                     }
-                    $('#account-list').html(html);
-                    renderPagination(res.page, res.total_pages);
+                },
+                error: function(xhr) {
+                    $('#loading').hide();
+                    console.error('❌ Accounts error:', xhr.status);
+                    $('#account-list').html(`<tr><td colspan="9" class="text-center text-danger py-4">❌ Lỗi tải dữ liệu: ${xhr.status}</td></tr>`);
                 }
             });
         }

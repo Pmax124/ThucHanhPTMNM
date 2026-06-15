@@ -16,6 +16,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 }
 
 require_once __DIR__ . '/../app/config/database.php';
+require_once __DIR__ . '/middleware/AuthMiddleware.php';
 
 $database = new Database();
 $db = $database->getConnection();
@@ -26,7 +27,9 @@ $action = $_GET['action'] ?? '';
 
 switch ($method) {
     case 'GET':
+        AuthMiddleware::requireAdmin();  // Chỉ admin xem thống kê
         if ($action === 'statistics') {
+            
             getStatistics($db);
         } elseif ($id) {
             getAccount($db, $id);
@@ -35,9 +38,11 @@ switch ($method) {
         }
         break;
     case 'POST':
+         AuthMiddleware::requireAdmin();  // Chỉ admin xem thống kê
         createAccount($db);
         break;
     case 'PUT':
+         AuthMiddleware::requireAdmin();  // Chỉ admin xem thống kê
         if ($id) {
             updateAccount($db, $id);
         } else {
@@ -45,6 +50,7 @@ switch ($method) {
         }
         break;
     case 'DELETE':
+         AuthMiddleware::requireAdmin();  // Chỉ admin xem thống kê
         if ($id) {
             deleteAccount($db, $id);
         } else {
